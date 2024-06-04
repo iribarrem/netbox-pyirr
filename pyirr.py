@@ -1,27 +1,39 @@
 import subprocess, json, pynetbox
 from pynetbox.core.response import Record, RecordSet
 
-def main():
-    as_set: str = "AS270777:AS-RGSUL"
+def get_prefixes_ipv4(as_set: str) -> list[str]:
+    '''Run BGPq4 and return a list of IPv4 prefixes belonging to AS-SET'''
 
     cmd_ipv4: list[str] = ["bgpq4", "-4j", as_set, "-L", "2", "-l", "prefixes"]
-    cmd_ipv6: list[str] = ["bgpq4", "-6j", as_set, "-L", "2", "-l", "prefixes"]
-    
     process_ipv4 = subprocess.Popen(cmd_ipv4, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    process_ipv6 = subprocess.Popen(cmd_ipv6, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
     output_ipv4, error_ipv4 = process_ipv4.communicate()
-    output_ipv6, error_ipv6 = process_ipv6.communicate()
-
     result_ipv4 = json.loads(output_ipv4.decode("ascii"))
-    result_ipv6 = json.loads(output_ipv6.decode("ascii"))
 
     prefixes_ipv4: list[str] = []
     for prefix in result_ipv4["prefixes"]:
         prefixes_ipv4.append(prefix["prefix"])
+
+    return prefixes_ipv4
+
+def get_prefixes_ipv6(as_set: str) -> list[str]:
+    '''Run BGPq4 and return a list of IPv6 prefixes belonging to AS-SET'''
+
+    cmd_ipv6: list[str] = ["bgpq4", "-6j", as_set, "-L", "2", "-l", "prefixes"]
+    process_ipv6 = subprocess.Popen(cmd_ipv6, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output_ipv6, error_ipv6 = process_ipv6.communicate()
+    result_ipv6 = json.loads(output_ipv6.decode("ascii"))
+
     prefixes_ipv6: list[str] = []
     for prefix in result_ipv6["prefixes"]:
         prefixes_ipv6.append(prefix["prefix"])
+
+    return prefixes_ipv6
+
+def main() -> None:
+    as_set: str = "AS270777:AS-RGSUL"
+
+    prefixes_ipv4: list[str] = get_prefixes_ipv4(as_set)
+    prefixes_ipv6: list[str] = get_prefixes_ipv6(as_set)
     
     netbox = pynetbox.api(url="https://netbox.iribarrem.com", token="b186b056aae496bb4b2f1b8240964dad6f941265", threading=True)
 
@@ -52,9 +64,9 @@ def main():
             pl_rule.delete()
 
     for index, prefix in enumerate(prefixes_ipv4, start=1):
-        netbox.plugins.bgp.prefix_list_rule.create(prefix_list=pl_ipv4.id, action="permit", index=index*10, prefix_custom=prefix)
+        print(netbox.plugins.bgp.prefix_list_rule.create(prefix_list=pl_ipv4.id, action="permit", index=index*10, prefix_custom=prefix))
     for index, prefix in enumerate(prefixes_ipv6, start=1):
-        netbox.plugins.bgp.prefix_list_rule.create(prefix_list=pl_ipv6.id, action="permit", index=index*10, prefix_custom=prefix)
+        print(netbox.plugins.bgp.prefix_list_rule.create(prefix_list=pl_ipv6.id, action="permit", index=index*10, prefix_custom=prefix))
 
 
 if __name__ == "__main__":
