@@ -1,5 +1,7 @@
-import subprocess, json, pynetbox, click, logging
+import subprocess, json, os, logging
+import pynetbox, click
 from pynetbox.core.response import Record, RecordSet
+from dotenv import load_dotenv
 
 log = logging.getLogger()
 handler = logging.StreamHandler()
@@ -9,10 +11,12 @@ handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
 
+load_dotenv()
+
 def get_prefixes_ipv4(as_set: str) -> list[str]:
     '''Run BGPq4 and return a list of IPv4 prefixes belonging to AS-SET'''
 
-    cmd_ipv4: list[str] = ["bgpq4", "-4j", as_set, "-L", "2", "-l", "prefixes"]
+    cmd_ipv4: list[str] = ["bgpq4", "-4j", "-L", "2", "-l", "prefixes", as_set]
     process_ipv4 = subprocess.Popen(cmd_ipv4, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output_ipv4, error_ipv4 = process_ipv4.communicate()
     result_ipv4 = json.loads(output_ipv4.decode("ascii"))
@@ -26,7 +30,7 @@ def get_prefixes_ipv4(as_set: str) -> list[str]:
 def get_prefixes_ipv6(as_set: str) -> list[str]:
     '''Run BGPq4 and return a list of IPv6 prefixes belonging to AS-SET'''
 
-    cmd_ipv6: list[str] = ["bgpq4", "-6j", as_set, "-L", "2", "-l", "prefixes"]
+    cmd_ipv6: list[str] = ["bgpq4", "-6j", "-L", "2", "-l", "prefixes", as_set]
     process_ipv6 = subprocess.Popen(cmd_ipv6, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output_ipv6, error_ipv6 = process_ipv6.communicate()
     result_ipv6 = json.loads(output_ipv6.decode("ascii"))
@@ -40,7 +44,7 @@ def get_prefixes_ipv6(as_set: str) -> list[str]:
 
 @click.command()
 @click.version_option(version="0.1", prog_name="PyIRR")
-@click.option("--verbose", "-v", is_flag=True)
+@click.option("--verbose", "-v", default=False)
 @click.argument("as_sets", nargs=-1, type=str)
 def cli(as_sets: list[str], verbose) -> None:
     if verbose:
@@ -50,7 +54,7 @@ def cli(as_sets: list[str], verbose) -> None:
         prefixes_ipv4: list[str] = get_prefixes_ipv4(as_set)
         prefixes_ipv6: list[str] = get_prefixes_ipv6(as_set)
         
-        netbox = pynetbox.api(url="https://netbox.iribarrem.com", token="b186b056aae496bb4b2f1b8240964dad6f941265", threading=True)
+        netbox = pynetbox.api(url=os.getenv("NETBOX_URL"), token=os.getenv("NETBOX_TOKEN"), threading=True)
 
         pl_ipv4_name: str = as_set + "_IPv4"
         pl_ipv6_name: str = as_set + "_IPv6"
